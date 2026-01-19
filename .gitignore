@@ -217,3 +217,5 @@ data/
 *.parquet
 
 docker/compose.override.yml
+
+.github/workflows/docker-publish.yml
