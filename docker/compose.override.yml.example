@@ -1,0 +1,7 @@
+# Copy this file to compose.override.yml and set your own password
+# cp compose.override.yml.example compose.override.yml
+
+services:
+  db:
+    environment:
+      POSTGRES_PASSWORD: changeme
