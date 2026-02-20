@@ -1,0 +1,33 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies if needed
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy your packages directory
+COPY packages/ /app/packages/
+
+# Install your package and its dependencies
+# Adjust the path based on your package structure
+RUN pip install --no-cache-dir streamlit
+
+# If you have a requirements.txt or pyproject.toml, install dependencies
+# Option 1: If you have a requirements.txt
+# COPY requirements.txt .
+# RUN pip install --no-cache-dir -r requirements.txt
+
+# Option 2: If using pyproject.toml with your suds-ui package
+RUN if [ -f /app/packages/suds-ui/pyproject.toml ]; then \
+    pip install --no-cache-dir /app/packages/suds-ui; \
+    fi
+
+EXPOSE 8501
+
+HEALTHCHECK CMD curl --fail http://localhost:8501/_stcore/health || exit 1
+
+# Command will be overridden by docker-compose
+CMD ["streamlit", "run", "packages/suds-ui/src/suds_ui/app.py", "--server.address=0.0.0.0"]

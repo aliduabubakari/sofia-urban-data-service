@@ -65,6 +65,25 @@ class Settings(BaseSettings):
     gate_api_key: Optional[str] = Field(default=None, validation_alias="GATE_API_KEY")
     gate_api_key_header: str = Field(default="X-API-Key", validation_alias="GATE_API_KEY_HEADER")
 
+    citylab_base_url: str = "https://citylab.gate-ai.eu/citylab/api"
+    citylab_api_key: str | None = None
+    citylab_timeout_s: int = 30
+
+    geoapify_api_key: str | None = None
+    geoapify_base_url: str = "https://api.geoapify.com/v1/geocode"
+
+    geocode_rate_limit_per_min: int = 60
+    geocode_batch_max_size: int = 100
+
+    geoapify_use_batch_api: bool = False
+    geoapify_batch_min_size: int = 25
+    geoapify_batch_timeout_s: int = 60
+    geoapify_batch_poll_s: float = 1.0
+
+    wikidata_api_url: str = "https://www.wikidata.org/w/api.php"
+    wikidata_cache_ttl_days: int = 30
+    wikidata_user_agent: str = "SUDS/0.1 (contact: you@example.com)"
+
     overpass_url: str = "https://overpass-api.de/api/interpreter"
     overpass_timeout_s: int = 60
     overpass_rate_limit_delay_s: float = 2.0
@@ -74,6 +93,15 @@ class Settings(BaseSettings):
 
     weather_cache_ttl_days: int = 90
     osm_cache_ttl_days: int = 30
+
+    openmeteo_forecast_url: str = Field(
+        default="https://api.open-meteo.com/v1/forecast",
+    )
+
+    weather_forecast_cache_ttl_hours: int = Field(
+        default=6,
+        description="Forecast cache TTL in hours. Forecast can change; archive is stable.",
+    )
 
     def resolved_database_url(self) -> str:
         if self.database_url:

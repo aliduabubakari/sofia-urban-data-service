@@ -211,6 +211,7 @@ data/
 *.gpkg
 *.shp
 *.dbf
+*.xlsx
 *.shx
 *.prj
 *.geojson

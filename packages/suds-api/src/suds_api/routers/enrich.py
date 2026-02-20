@@ -11,7 +11,7 @@ from suds_core.db.models import Buildings, GreenAreas, POIs, PedestrianNetwork, 
 from suds_core.geo.bbox import bbox_from_point_radius
 from suds_core.geo.crs import parse_bbox
 from suds_core.services.datasets import get_features_bbox, get_features_radius
-from suds_core.services.osm_point import get_or_compute_osm_metrics_point
+from suds_core.services.osm_point import get_or_compute_osm_metrics
 from suds_core.services.weather_point import get_or_fetch_weather_daily_point
 
 router = APIRouter()
@@ -94,12 +94,15 @@ def enrich_point(
 
     # OSM metrics (cached in DB)
     if include_osm:
-        result["osm"] = get_or_compute_osm_metrics_point(
+        result["osm"] = get_or_compute_osm_metrics(
             session,
             lat=lat,
             lon=lon,
-            buffer_m=radius_m,
-            force_refresh=osm_refresh,
+            radius_m=radius_m,
+            refresh=osm_refresh,
+            detail="basic",
+            accurate_coverage=False,
+            top_n=10,
         )
 
     # Weather (cached in DB)
@@ -112,9 +115,9 @@ def enrich_point(
             lon=lon,
             start_date=start,
             end_date=end,
-            provider="openmeteo",
+            source="archive",
         )
-        result["weather_daily"] = {"provider": "openmeteo", "rows": rows}
+        result["weather_daily"] = {"source": "archive", "rows": rows}
 
         # Convenience: expose elevation once (same for all rows)
         if rows:
