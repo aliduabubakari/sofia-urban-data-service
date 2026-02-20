@@ -221,3 +221,4 @@ docker/compose.override.yml
 
 .github/workflows/docker-publish.yml
 .github/workflows/ci.yml
+*.dump
