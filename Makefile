@@ -85,6 +85,9 @@ install-ui: venv
 .PHONY: db-up
 db-up:
 	@$(COMPOSE) up -d db
+	@echo "Waiting for PostGIS to be ready..."
+	@until docker exec suds-postgis pg_isready -U postgres -d suds -q; do sleep 1; done
+	@echo "PostGIS is ready."
 
 .PHONY: db-down
 db-down:
