@@ -24,11 +24,11 @@ help:
 	@echo "  make install-dev       Install suds-core + suds-api in editable mode (+ dev extras)"
 	@echo ""
 	@echo "Database:"
-	@echo "  make db-up             Start PostGIS"
+	@echo "  make db-up             Start PostGIS and wait until ready"
 	@echo "  make db-down           Stop services"
 	@echo "  make db-reset          Stop + remove volumes (DANGEROUS: deletes DB data)"
 	@echo "  make db-logs           Tail DB logs"
-	@echo "  make create-tables     Create tables (SQLAlchemy create_all)"
+	@echo "  make create-tables     Create tables idempotently (safe to re-run)"
 	@echo "  make validate-db       Run DB validation checks"
 	@echo "  make analyze-db        VACUUM/ANALYZE"
 	@echo "  make schema-dump       Regenerate docker/db-init/02_schema.sql from running DB"
@@ -82,6 +82,13 @@ install-ui: venv
 # -----------------------
 # Database
 # -----------------------
+
+# Starts PostGIS and waits until it is genuinely ready to accept connections.
+# The init scripts in docker/db-init/ run automatically on a fresh volume:
+#   01_postgis.sql  - enables PostGIS extensions
+#   02_schema.sql   - creates all application tables and indexes
+# After db-up, run `make create-tables` to ensure the schema is applied
+# idempotently (safe whether or not the init scripts already ran).
 .PHONY: db-up
 db-up:
 	@$(COMPOSE) up -d db
@@ -97,6 +104,9 @@ db-down:
 db-reset:
 	@$(COMPOSE) down -v
 	@$(COMPOSE) up -d db
+	@echo "Waiting for PostGIS to be ready..."
+	@until docker exec suds-postgis pg_isready -U postgres -d suds -q; do sleep 1; done
+	@echo "PostGIS is ready."
 
 .PHONY: db-logs
 db-logs:
@@ -119,7 +129,7 @@ purge-cache: install-core
 	@$(RUN) scripts/ops/purge_cache.py
 
 # Regenerate the schema-only init file from the running DB.
-# The topology schema is excluded because it is created by 01_postgis.sql already.
+# The topology schema is excluded because 01_postgis.sql already creates it.
 # Run this after any model changes and commit the result.
 .PHONY: schema-dump
 schema-dump:
@@ -154,7 +164,7 @@ db-dump:
 	@echo "Done: $(DUMP)"
 
 # Restore the full database from a binary .dump file.
-# Requires the DB container to be running (make db-up).
+# Requires a running DB (make db-up).
 # Usage:
 #   make db-restore
 #   make db-restore DUMP=exports/suds_20260220.dump
