@@ -12,6 +12,9 @@ RUN := $(VENV)/bin/python
 
 COMPOSE := docker compose -f docker/compose.yml
 
+# Path for pg_dump/pg_restore data dump (override with DUMP=yourfile.dump)
+DUMP ?= suds_full.dump
+
 .PHONY: help
 help:
 	@echo "SUDS - common targets"
@@ -27,7 +30,11 @@ help:
 	@echo "  make db-logs           Tail DB logs"
 	@echo "  make create-tables     Create tables (SQLAlchemy create_all)"
 	@echo "  make validate-db       Run DB validation checks"
-	@echo "  make analyze-db        VACUUM/ANALYZE (needs shm_size set in compose)"
+	@echo "  make analyze-db        VACUUM/ANALYZE"
+	@echo "  make schema-dump       Regenerate docker/db-init/02_schema.sql from running DB"
+	@echo "  make db-dump           Dump full DB to DUMP file (default: suds_full.dump)"
+	@echo "  make db-restore        Restore full DB from DUMP file (default: suds_full.dump)"
+	@echo "                         Override: make db-restore DUMP=path/to/file.dump"
 	@echo ""
 	@echo "Ingestion:"
 	@echo "  make ingest-all        Ingest all datasets in recommended order"
@@ -107,6 +114,65 @@ analyze-db: install-core
 .PHONY: purge-cache
 purge-cache: install-core
 	@$(RUN) scripts/ops/purge_cache.py
+
+# Regenerate the schema-only init file from the running DB.
+# The topology schema is excluded because it is created by 01_postgis.sql already.
+# Run this after any model changes and commit the result.
+.PHONY: schema-dump
+schema-dump:
+	@echo "Dumping schema from running DB -> docker/db-init/02_schema.sql ..."
+	@docker exec suds-postgis pg_dump \
+		-U postgres \
+		-d suds \
+		--schema-only \
+		--no-owner \
+		--no-acl \
+		--exclude-schema=topology \
+		> docker/db-init/02_schema.sql
+	@echo "Done. Commit docker/db-init/02_schema.sql to git."
+
+# Dump the full database (schema + data) to a binary .dump file.
+# Share this file with collaborators who need a fully populated DB.
+# Usage:
+#   make db-dump
+#   make db-dump DUMP=exports/suds_20260220.dump
+.PHONY: db-dump
+db-dump:
+	@echo "Dumping full DB to $(DUMP) ..."
+	@docker exec suds-postgis pg_dump \
+		-U postgres \
+		-d suds \
+		--format=custom \
+		--no-owner \
+		--no-acl \
+		-f /tmp/suds_dump.dump
+	@docker cp suds-postgis:/tmp/suds_dump.dump $(DUMP)
+	@docker exec suds-postgis rm /tmp/suds_dump.dump
+	@echo "Done: $(DUMP)"
+
+# Restore the full database from a binary .dump file.
+# Requires the DB container to be running (make db-up).
+# Usage:
+#   make db-restore
+#   make db-restore DUMP=exports/suds_20260220.dump
+.PHONY: db-restore
+db-restore:
+	@if [ ! -f "$(DUMP)" ]; then \
+		echo "ERROR: dump file not found: $(DUMP)"; \
+		echo "Usage: make db-restore DUMP=path/to/file.dump"; \
+		exit 1; \
+	fi
+	@echo "Restoring DB from $(DUMP) ..."
+	@docker cp $(DUMP) suds-postgis:/tmp/suds_restore.dump
+	@docker exec suds-postgis pg_restore \
+		-U postgres \
+		-d suds \
+		--no-owner \
+		--no-acl \
+		-v \
+		/tmp/suds_restore.dump 2>&1 | tail -5
+	@docker exec suds-postgis rm /tmp/suds_restore.dump
+	@echo "Done. Run 'make validate-db' to verify."
 
 # -----------------------
 # Ingestion
